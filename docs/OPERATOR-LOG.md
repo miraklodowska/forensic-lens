@@ -95,8 +95,13 @@ Community Forensics' training data (arXiv:2411.04125, collected mid-2024).
   JSON.stringify(ImageBitmap) === "{}" so chrome.runtime messaging (JSON)
   cannot carry pixels; CORS+crossorigin=anonymous reads OK but pages don't set
   it and re-loading with crossorigin is itself a network fetch.
-  ⇒ The offscreen refetch is the only general path; honesty, not avoidance,
-  was the right fix. (Live-extension confirmation of the messaging half
+  ⇒ Of the paths that preserve the pixels, the offscreen refetch is the only
+  general one; honesty, not avoidance, was the right fix. Correction (later
+  review): "only path" overstated it. `chrome.tabs.captureVisibleTab` also
+  avoids the request, and was not tested here. It is still the wrong choice —
+  a capture yields display-resolution pixels, so a downscaled thumbnail loses
+  the native detail the fingerprint model depends on — but the reason is that
+  capture destroys the signal, not that no alternative exists. (Live-extension confirmation of the messaging half
   belongs to item 3.)
 
 ### Item 4 (INT8-vs-FP32 re-measure) — DONE

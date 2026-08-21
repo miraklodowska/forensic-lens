@@ -28,9 +28,10 @@ happens there. Inference runs on **WebGPU** where available and falls back to
 **WASM (SIMD)** otherwise.
 
 Images are fetched by URL in the offscreen document rather than read off the
-page, because the page's pixels are unreachable: a cross-origin image taints
-any canvas it is drawn into, and extension messaging is JSON, so decoded pixels
-cannot be transferred out of the content script. This refetch is **not** a
+page, because a cross-origin image taints any canvas it is drawn into, and
+extension messaging is JSON, so decoded pixels cannot be transferred out of the
+content script. (`chrome.tabs.captureVisibleTab` could sidestep both — see
+[Privacy](#privacy) for why it is the wrong trade here.) This refetch is **not** a
 cache hit — Chrome partitions its HTTP cache by top-level site, and the
 extension's offscreen document is never the page's site — so **every analysed
 image costs one outbound GET to its own origin**. To keep that honest and
@@ -123,12 +124,20 @@ cd /tmp/fl-parity && python3 -m http.server 8801
 - **At analysis time, each analysed image is re-fetched once from its own
   origin** (the same `currentSrc` URL the page already displayed, with
   `credentials: 'omit'`). The image's host can observe that second request;
-  no third party is contacted. This refetch is unavoidable for cross-origin
-  images — canvas tainting blocks reading their pixels from the page, and
-  extension messaging cannot carry an ImageBitmap — and Chrome's partitioned
-  HTTP cache means it really does hit the network, not the cache. An earlier
-  version of this README claimed the refetch was "normally a cache hit"; that
-  was wrong.
+  no third party is contacted. Chrome's partitioned HTTP cache means it really
+  does hit the network, not the cache. An earlier version of this README
+  claimed the refetch was "normally a cache hit"; that was wrong.
+- Why not read the pixels off the page instead? For cross-origin images that
+  does not work: canvas tainting blocks the readback and extension messaging
+  is JSON, so it cannot carry an `ImageBitmap`. Both were tested rather than
+  assumed — see `docs/review/taint-test.mjs`.
+- One alternative *would* avoid the request: `chrome.tabs.captureVisibleTab`,
+  cropping the image's rectangle out of a viewport capture. It is rejected on
+  a measurement argument, not an impossibility one. A capture returns pixels at
+  **display** resolution, so a 1024px photo shown as a 200px thumbnail comes
+  back as 200px of rescaled pixels — destroying exactly the native-resolution
+  detail the fingerprint detector reads, in precisely the size regime where
+  accuracy is already worst. It trades a network request for the signal itself.
 - Consequence: **analysis needs the network.** Offline, pages render their
   cached images but no badges appear.
 - At build time, `fetch:models` downloads one pinned, hash-verified model
