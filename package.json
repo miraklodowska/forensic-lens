@@ -1,0 +1,38 @@
+{
+  "name": "forensic-lens",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Chrome MV3 extension that scores webpage images for AI generation entirely on-device.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "models",
+    "docs",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "fetch:models": "node scripts/fetch-models.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "verify": "npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/chrome": "0.2.5",
+    "@types/node": "22.18.12",
+    "esbuild": "0.28.2",
+    "jsdom": "30.0.1",
+    "onnxruntime-node": "1.27.0",
+    "onnxruntime-web": "1.27.0",
+    "sharp": "0.35.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$comment": "Model artifacts the extension ships. `artifacts` are downloaded once by `npm run fetch:models`, pinned to an immutable commit and verified by SHA-256 — that is the only step in this project that touches the network. `bundled` artifacts are checked into the repository because no upstream publishes them in this format; scripts/convert-siglip.py regenerates them deterministically (verified: the same SHA-256 on a clean re-run).",
+  "artifacts": [
+    {
+      "file": "cf-vit.onnx",
+      "displayName": "Community Forensics DeepfakeDet-ViT (FP32)",
+      "license": "MIT",
+      "attribution": "Jeongsoo Park and Andrew Owens, University of Michigan, CVPR 2025 (arXiv:2411.04125). ONNX export by Han Yoon / Borderless.",
+      "source": {
+        "kind": "huggingface",
+        "repo": "buildborderless/CommunityForensics-DeepfakeDet-ViT",
+        "revision": "ac6ee457bea904a373065754107451793b56db00",
+        "path": "onnx/model.onnx"
+      },
+      "sizeBytes": 87442080,
+      "sha256": "a42c7d740fbb345ba9a26d469b22f301d73089ce3c6da993877ed2b6965a8ba1"
+    }
+  ],
+  "bundled": [
+    {
+      "file": "siglip-detector-int8.onnx",
+      "displayName": "SigLIP2 AI-vs-human detector (dynamic INT8 ONNX)",
+      "license": "Apache-2.0",
+      "attribution": "Ateeqq/ai-vs-human-image-detector, Apache-2.0. Exported to ONNX and dynamically quantized by scripts/convert-siglip.py; upstream publishes safetensors only.",
+      "source": { "kind": "huggingface", "repo": "Ateeqq/ai-vs-human-image-detector", "path": "model.safetensors" },
+      "sizeBytes": 86573923,
+      "sha256": "e935eed523d6dd09c97de68e34f10543aa0b6c39be4678cbbb0c7a0402d0ffc6"
+    }
+  ]
+}

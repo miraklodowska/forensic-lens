@@ -1,0 +1,124 @@
+{
+  "$comment": "Runtime detection recipe. Fusion constants are fitted by tools/eval/finalize_v2.py against a 3,559-image public corpus; see docs/EVALUATION.md. The size gate is multiplicative and bounded in [0, cfMax] so it can discount the fingerprint detector's vote but never invert it. executionProviders is per-model: ONNX Runtime's WebGPU backend does not implement this build's INT8 operators and silently returns a constant for every input, so quantized models pin to WASM.",
+  "schemaVersion": 3,
+  "models": [
+    {
+      "id": "community-forensics-vit",
+      "role": "cf",
+      "file": "cf-vit.onnx",
+      "input": {
+        "name": "pixel_values",
+        "size": 384,
+        "layout": "nchw",
+        "channelOrder": "rgb",
+        "normalize": {
+          "mean": [
+            0.48145466,
+            0.4578275,
+            0.40821073
+          ],
+          "std": [
+            0.26862954,
+            0.26130258,
+            0.27577711
+          ]
+        }
+      },
+      "output": {
+        "name": "logits",
+        "kind": "single-logit-sigmoid"
+      },
+      "views": [
+        {
+          "id": "off440",
+          "kind": "scale",
+          "shortestEdge": 440,
+          "crop": 384
+        },
+        {
+          "id": "s768",
+          "kind": "scale",
+          "shortestEdge": 768,
+          "crop": 384,
+          "maxUpscale": 2
+        },
+        {
+          "id": "nc",
+          "kind": "native",
+          "position": "center",
+          "crop": 384
+        }
+      ],
+      "aggregate": "mean",
+      "executionProviders": [
+        "webgpu",
+        "wasm"
+      ]
+    },
+    {
+      "id": "siglip-ai-vs-human",
+      "role": "sg",
+      "file": "siglip-detector-int8.onnx",
+      "input": {
+        "name": "pixel_values",
+        "size": 224,
+        "layout": "nchw",
+        "channelOrder": "rgb",
+        "normalize": {
+          "mean": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "std": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        }
+      },
+      "output": {
+        "name": "logits",
+        "kind": "two-logit-softmax",
+        "positiveIndex": 0
+      },
+      "views": [
+        {
+          "id": "sq",
+          "kind": "squash",
+          "size": 224
+        },
+        {
+          "id": "ar",
+          "kind": "scale",
+          "shortestEdge": 224,
+          "crop": 224
+        },
+        {
+          "id": "nc",
+          "kind": "native",
+          "position": "center",
+          "crop": 224
+        }
+      ],
+      "aggregate": "mean",
+      "executionProviders": [
+        "wasm"
+      ]
+    }
+  ],
+  "fusion": {
+    "kind": "size-gated-linear",
+    "weights": {
+      "cfMax": 0.321790620416166,
+      "sg": 0.14348070231780133
+    },
+    "gate": {
+      "a": 1.0,
+      "t": 0.0
+    },
+    "intercept": 1.3203670149118865,
+    "thresholdOffset": 0.6190392084062236,
+    "referenceEdge": 384
+  }
+}

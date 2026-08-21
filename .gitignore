@@ -1,0 +1,13 @@
+node_modules/
+dist/
+test-results/
+.DS_Store
+*.part
+
+# Fetched by `npm run fetch:models` (pinned commit + SHA-256 verified).
+models/weights/cf-vit.onnx
+
+# Working directory for scripts/convert-siglip.py (343 MB fp32 intermediate).
+# The shipped INT8 export, models/weights/siglip-detector-int8.onnx, IS tracked:
+# no upstream publishes it, so the repo must carry it to build from source.
+models/weights/siglip/
