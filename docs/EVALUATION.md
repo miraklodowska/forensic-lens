@@ -94,7 +94,8 @@ At the required **0.65** threshold, on the full 3,559-image corpus:
 | Configuration | Balanced accuracy | LOFO mean |
 |---|---|---|
 | Old additive gate (the first shipped attempt) | 72.9% | — |
-| **Ensemble, multiplicative gate (current)** | **75.9%** | **76.0%** |
+| Multiplicative gate, INT8 SigLIP2 | 75.9% | 76.0% |
+| **Multiplicative gate, FP32 SigLIP2 (current)** | **78.6%** | **78.5%** |
 
 **Leave-one-family-out** holds out each family in turn, refits the calibration
 without it, and scores the held-out family. Derived small-image sets inherit
@@ -122,29 +123,44 @@ Note this is not a trade: the corrected gate is better on both axes at once. The
 earlier number was not a real result that we gave up to fix a bug — it was an
 artifact of the evaluation set.
 
-### Quantization cost
+### Quantization cost — and why FP32 is now shipped
 
 Re-measured 2026-08-14 on the current 3,559-image corpus and multiplicative
 gate (FP32 logits: `logits_siglip.json`, refit with `finalize_v2.py`):
 
 | SigLIP2 build | in-sample | LOFO | real FP <160px | AI recall <160px |
 |---|---|---|---|---|
-| INT8 (shipped) | 75.9% | 76.0% | 35.5% | 66.6% |
-| FP32 | **78.6%** | **78.5%** | **25.2%** | 59.8%* |
+| INT8 | 75.9% | 76.0% | 35.5% | 66.6% |
+| **FP32 (shipped)** | **78.6%** | **78.5%** | **25.2%** | 59.8%* |
 
 Dynamic INT8 costs **2.7 points in-sample / 2.5 LOFO** in exchange for
 343 MB → 87 MB. (An earlier version of this section carried 82.0→79.5 figures
 from the old 2,439-image corpus; magnitude now confirmed on current data.)
 *The FP32 fit chooses a steeper gate (a=3.0, t=−0.5) that trusts CF less on
 small images, trading small-image recall for far fewer false positives there.
-The loss is real and matches what the Community Forensics authors document for
-their own INT8 export. It is taken deliberately: a 430 MB unpacked extension is
-not something anyone will install. To trade back, run
-`scripts/convert-siglip.py`, point `models/pipeline.json` at `model.onnx`, and
-refit with `tools/eval/finalize_v2.py`.
+The loss matches what the Community Forensics authors document for their own
+INT8 export, and INT8 was shipped first only because 343 MB would not fit in a
+GitHub repository. That turned out to be the wrong thing to optimise: the
+weights are now downloaded from the Hub by `npm run fetch:models`, pinned and
+hash-verified like the Community Forensics model, so the repository is ~1 MB
+and the accuracy is the FP32 accuracy.
 
-Static (calibrated) INT8 should recover most of the gap and is the obvious next
-improvement; the attempt here exhausted memory on a 343 MB graph.
+INT8 also proved *brittle across runtimes*, separately from being less accurate:
+ONNX Runtime's Python CPU INT8 kernels and ORT-web's WASM INT8 kernels disagreed
+by up to 16.6 in logit space on the same input, with one 256px FLUX image
+scoring +6.4 in Python and −10.6 in the browser. That alone justified the
+change; the 2.7 points were a bonus.
+
+To go back to INT8, run `scripts/convert-siglip.py`, point
+`models/pipeline.json` at the INT8 file and refit with
+`tools/eval/finalize_v2.py`. The FP32 fit chooses a steeper gate (a=3.0,
+t=−0.5 against INT8's a=1.0, t=0.0) — it distrusts the fingerprint detector
+faster as images shrink, trading small-image recall for far fewer false
+positives there.
+
+Static (calibrated) INT8 might have closed the accuracy gap and is a reasonable
+future experiment; the attempt here exhausted memory on a 343 MB graph. It would
+not fix the cross-runtime disagreement.
 
 ## Unseen-generator evaluation (2026-08-14): the number that decides viability
 

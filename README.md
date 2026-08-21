@@ -53,7 +53,7 @@ Two complementary detectors, fused with a size gate:
 | Model | Role | License |
 |---|---|---|
 | [Community Forensics DeepfakeDet-ViT](https://huggingface.co/buildborderless/CommunityForensics-DeepfakeDet-ViT) (ViT-S/16 @384) | per-pixel generator fingerprints | MIT |
-| [SigLIP2 AI-vs-human](https://huggingface.co/Ateeqq/ai-vs-human-image-detector) (@224) | semantic “does this look generated” | Apache-2.0 |
+| [SigLIP2 AI-vs-human](https://huggingface.co/Ateeqq/ai-vs-human-image-detector) (@224, FP32 [ONNX export](https://huggingface.co/miraklodiwska1/siglip-ai-vs-human-onnx)) | semantic “does this look generated” | Apache-2.0 |
 
 They fail in different places, and predictably so: the fingerprint reader needs
 native-resolution pixels and goes blind on small images, while the semantic one
@@ -62,7 +62,7 @@ inference time, so it gates how far the first model is trusted. Full method,
 measured numbers and known weaknesses are in **[docs/EVALUATION.md](docs/EVALUATION.md)**.
 
 Measured on a 3,559-image corpus of real and AI images from public datasets:
-**75.9% balanced accuracy** at the 0.65 threshold, **76.0%** under
+**78.6% balanced accuracy** at the 0.65 threshold, **78.5%** under
 leave-one-family-out cross-validation. Read that number carefully: the
 fingerprint model's training data covers most of those generator families, so
 it describes 2024-era generators. On a 1,082-image corpus of **generators the
@@ -85,13 +85,13 @@ npm run fetch:models
 npm run build
 ```
 
-`fetch:models` is the only step that touches the network. It downloads one
-artifact from Hugging Face, pinned to an immutable commit SHA and verified by
-SHA-256, and verifies the SHA-256 of the second model, which ships in the repo.
-After this the extension is fully offline — you can disconnect and everything
-below still works.
+`fetch:models` is the only step that touches the network. It downloads both
+models from Hugging Face, each pinned to an immutable commit SHA and verified by
+SHA-256. No weights are committed, so a clone is about 1 MB. After this the
+extension is fully offline — you can disconnect and everything below still
+works.
 
-`npm run build` writes `dist/` (~215 MB, almost all model weights).
+`npm run build` writes `dist/` (~472 MB, almost all model weights).
 
 ## Install
 
@@ -177,7 +177,7 @@ rather than 5,000 inference runs. Scroll and the rest are scored.
 
 The 77.5% is twenty images — far too small to be an accuracy measurement. It is
 here to show the shipped pipeline produces sane scores end-to-end, and that it
-lands near the 75.9% offline figure rather than somewhere unrelated. The real
+lands near the 78.6% offline figure rather than somewhere unrelated. The real
 numbers are in [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ## Privacy

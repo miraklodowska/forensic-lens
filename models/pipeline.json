@@ -57,7 +57,7 @@
     {
       "id": "siglip-ai-vs-human",
       "role": "sg",
-      "file": "siglip-detector-int8.onnx",
+      "file": "siglip-detector-fp32.onnx",
       "input": {
         "name": "pixel_values",
         "size": 224,
@@ -109,14 +109,14 @@
   "fusion": {
     "kind": "size-gated-linear",
     "weights": {
-      "cfMax": 0.321790620416166,
-      "sg": 0.14348070231780133
+      "cfMax": 0.2239776631419307,
+      "sg": 0.1601007688236165
     },
     "gate": {
-      "a": 1.0,
-      "t": 0.0
+      "a": 3.0,
+      "t": -0.5
     },
-    "intercept": 1.3203670149118865,
+    "intercept": 0.8719722860459667,
     "thresholdOffset": 0.6190392084062236,
     "referenceEdge": 384
   }

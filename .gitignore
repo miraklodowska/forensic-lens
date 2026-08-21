@@ -4,8 +4,9 @@ test-results/
 .DS_Store
 *.part
 
-# Fetched by `npm run fetch:models` (pinned commit + SHA-256 verified).
-models/weights/cf-vit.onnx
+# Both models are fetched by `npm run fetch:models` (pinned commit + SHA-256
+# verified), so no weights are committed and a clone stays ~1 MB.
+models/weights/*.onnx
 
 # Working directory for scripts/convert-siglip.py (343 MB fp32 intermediate).
 # The shipped INT8 export, models/weights/siglip-detector-int8.onnx, IS tracked:
