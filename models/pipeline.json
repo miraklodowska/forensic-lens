@@ -1,5 +1,5 @@
 {
-  "$comment": "Runtime detection recipe. Fusion constants are fitted by tools/eval/finalize_v2.py against a 3,559-image public corpus; see docs/EVALUATION.md. The size gate is multiplicative and bounded in [0, cfMax] so it can discount the fingerprint detector's vote but never invert it. executionProviders is per-model: ONNX Runtime's WebGPU backend does not implement this build's INT8 operators and silently returns a constant for every input, so quantized models pin to WASM.",
+  "$comment": "Runtime detection recipe. Fusion constants are fitted by tools/eval/finalize_v2.py against a 3,559-image public corpus; see docs/EVALUATION.md. The size gate is multiplicative and bounded in [0, cfMax] so it can discount the fingerprint detector's vote but never invert it. executionProviders is 'wasm' for both models, verified live in Chrome 136: ONNX Runtime's WebGPU provider blocks the offscreen document's thread synchronously at 100% CPU and never returns, and because the block is synchronous no timeout can recover it. WebGPU also mis-executes this build's INT8 operators, returning a constant for every input.",
   "schemaVersion": 3,
   "models": [
     {
@@ -51,7 +51,6 @@
       ],
       "aggregate": "mean",
       "executionProviders": [
-        "webgpu",
         "wasm"
       ]
     },

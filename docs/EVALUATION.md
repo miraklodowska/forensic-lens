@@ -306,6 +306,48 @@ Steady-state per-image throughput for the FP32/WebGPU configuration was not
 cleanly measured (the runs include one-off shader compilation), so it is quoted
 as "removes the bottleneck in principle" rather than with a number.
 
+## Live browser verification, and two bugs only it could find
+
+Everything above measures the *numbers*. None of it proves the extension runs.
+`tools/e2e/live-test.mjs` loads the packed `dist/` into a real Chrome 136 and
+checks that badges appear in a page's DOM. Doing that found two defects, both
+fatal, neither visible to any offline test:
+
+**1. The extension could never be installed, on any Chrome.** The manifest
+declared `worker-src 'self' blob:`, and Chrome rejects `blob:` in that
+directive outright:
+
+```
+Failed to load extension from: .../dist
+'content_security_policy.extension_pages': Insecure CSP value "blob:" in directive 'worker-src'.
+```
+
+The directive was speculative — added in case ONNX Runtime needed blob workers,
+which it does not at `numThreads = 1`. Removing it fixed installation. Earlier
+attempts to load the extension had been misattributed to Chrome M137 dropping
+`--load-extension`; that was wrong, and the mistake persisted because the
+failure was only ever observed through automation that reported "no service
+worker" rather than Chrome's actual error message.
+
+**2. WebGPU hangs the offscreen document.** With the extension finally
+installable, it still scored nothing: a renderer pinned at 100% CPU and an
+offscreen document that would not answer even `Log.enable`.
+`InferenceSession.create` on the WebGPU provider never returns inside an
+offscreen document. `navigator.gpu.requestAdapter()` *does* resolve there, so
+probing the adapter is not a sufficient guard, and because the block is
+synchronous a `Promise.race` timeout never fires either. Both models are now
+pinned to WASM in `models/pipeline.json`.
+
+With both fixed, the extension scores end-to-end: **77.5% balanced accuracy**
+(AI recall 69.2%, real specificity 85.7%) on a 20-image in-browser sample —
+consistent with the 75.9% offline number, on a sample far too small to be a
+measurement in its own right.
+
+The general lesson matches the size-gate one: every layer here was verified in
+isolation — unit tests, Python harness, browser parity harness on the real
+weights — and the product was still completely broken. Integration was the one
+thing nothing tested.
+
 ## Known weaknesses
 
 These are real and are not hidden by the headline number.

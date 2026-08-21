@@ -61,6 +61,39 @@ function post(message: unknown): void {
   });
 }
 
+/**
+ * Whether the WebGPU execution provider can actually be used *here*.
+ *
+ * `'gpu' in navigator` is true inside an offscreen document, but the adapter
+ * request does not necessarily resolve: an offscreen document has no
+ * compositor, and on this Chrome `InferenceSession.create({webgpu})` spins at
+ * 100% CPU forever instead of failing. A hung provider is worse than an absent
+ * one — the engine never reports ready, every analysis awaits it, and the
+ * extension looks installed but silently scores nothing. So the adapter is
+ * probed behind a timeout first, and a null/slow answer means WASM.
+ */
+async function webgpuUsable(timeoutMs = 3000): Promise<boolean> {
+  const gpu = (navigator as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
+  if (!gpu) return false;
+  try {
+    const adapter = await Promise.race([
+      gpu.requestAdapter(),
+      new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ]);
+    return adapter !== null && adapter !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/** Rejects rather than hanging, so one bad provider cannot wedge startup. */
+function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)),
+  ]);
+}
+
 async function buildSessions(): Promise<void> {
   ort.env.wasm.wasmPaths = chrome.runtime.getURL('vendor/ort/');
   // Extension pages are not cross-origin isolated, so SharedArrayBuffer — and
@@ -74,7 +107,8 @@ async function buildSessions(): Promise<void> {
   if (!res.ok) throw new Error(`pipeline.json: HTTP ${res.status}`);
   const pipeline = (await res.json()) as PipelineSpec;
 
-  const hasGpu = 'gpu' in navigator;
+  const hasGpu = await webgpuUsable();
+  if (!hasGpu) console.info('[forensic-lens] WebGPU unavailable here; using WASM');
   const built: typeof sessions = [];
   const used: ('webgpu' | 'wasm')[] = [];
 
@@ -87,10 +121,14 @@ async function buildSessions(): Promise<void> {
     let lastError: unknown;
     for (const provider of providers.length > 0 ? providers : (['wasm'] as const)) {
       try {
-        session = await ort.InferenceSession.create(bytes, {
-          executionProviders: [provider],
-          graphOptimizationLevel: 'all',
-        });
+        session = await withTimeout(
+          ort.InferenceSession.create(bytes, {
+            executionProviders: [provider],
+            graphOptimizationLevel: 'all',
+          }),
+          provider === 'webgpu' ? 20000 : 120000,
+          `${spec.id} on ${provider}`,
+        );
         used.push(provider);
         break;
       } catch (error) {

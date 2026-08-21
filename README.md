@@ -24,8 +24,15 @@ page's CSP, so they cannot host a WASM/WebGPU runtime. Service workers get torn
 down after ~30 s of idle and have no GPU adapter, so a warm ONNX session cannot
 live there either. An **offscreen document** is the one context with a canvas, a
 GPU adapter and a lifetime the extension controls, so all decoding and inference
-happens there. Inference runs on **WebGPU** where available and falls back to
-**WASM (SIMD)** otherwise.
+happens there. Inference runs on **WASM (SIMD)**, single-threaded.
+
+WebGPU is deliberately not used, which live testing forced: inside an offscreen
+document ONNX Runtime's WebGPU provider blocks the thread *synchronously* at
+100% CPU and never returns, so the engine never becomes ready and the extension
+looks installed while silently scoring nothing. Because the block is
+synchronous, no timeout can recover it — the provider simply cannot be
+attempted here. (It also mis-executes this build's INT8 operators, returning a
+constant for every input; see [docs/EVALUATION.md](docs/EVALUATION.md).)
 
 Images are fetched by URL in the offscreen document rather than read off the
 page, because a cross-origin image taints any canvas it is drawn into, and
@@ -93,8 +100,13 @@ below still works.
 3. Click **Load unpacked** and choose the `dist/` directory
 4. Visit any page with images
 
-The popup shows which backend was selected (WEBGPU or WASM), how many images
-have been analysed, and lets you change the threshold.
+The popup shows the backend in use, how many images have been analysed, and
+lets you change the threshold.
+
+Verified live in Chrome 136 (`tools/e2e/live-test.mjs`): extension loads,
+service worker starts, offscreen document builds both sessions, and badges
+render in the page with scores — 77.5% balanced accuracy on a 20-image
+end-to-end sample, consistent with the 75.9% offline figure.
 
 > Chrome removed support for the `--load-extension` command-line flag in M137,
 > so the extension must be loaded through the UI as above. This affects
