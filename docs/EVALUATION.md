@@ -143,8 +143,8 @@ INT8 export, and INT8 was shipped first only because 343 MB would not fit in a
 GitHub repository. That turned out to be the wrong thing to optimise: the
 weights are now downloaded from the Hub by `npm run fetch:models`, pinned and
 hash-verified like the Community Forensics model, so nothing is committed and
-the accuracy is the FP32 accuracy. (The tracked tree is under 1 MB; a clone is
-still ~57 MB until the INT8 blob is purged from history.)
+the accuracy is the FP32 accuracy. The INT8 blob was purged from git history
+afterwards, taking a clone from 57 MB to 392 KB.
 
 INT8 also proved *brittle across runtimes*, separately from being less accurate:
 ONNX Runtime's Python CPU INT8 kernels and ORT-web's WASM INT8 kernels disagreed

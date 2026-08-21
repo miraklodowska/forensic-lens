@@ -87,11 +87,9 @@ npm run build
 
 `fetch:models` is the only step that touches the network. It downloads both
 models from Hugging Face, each pinned to an immutable commit SHA and verified by
-SHA-256. No weights are committed, so the tracked tree is under 1 MB — though a
-clone is currently ~57 MB, because git history still carries the INT8 SigLIP2
-model that earlier commits shipped. Dropping that needs a history rewrite.
-After `fetch:models` the extension is fully offline — you can disconnect and
-everything below still works.
+SHA-256. No weights are committed and none remain in git history, so a clone is
+under 1 MB (measured: 392 KB). After `fetch:models` the extension is fully
+offline — you can disconnect and everything below still works.
 
 `npm run build` writes `dist/` (~472 MB, almost all model weights).
 
