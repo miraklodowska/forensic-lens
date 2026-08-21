@@ -101,12 +101,8 @@ below still works.
 4. Visit any page with images
 
 The popup shows the backend in use, how many images have been analysed, and
-lets you change the threshold.
-
-Verified live in Chrome 136 (`tools/e2e/live-test.mjs`): extension loads,
-service worker starts, offscreen document builds both sessions, and badges
-render in the page with scores — 77.5% balanced accuracy on a 20-image
-end-to-end sample, consistent with the 75.9% offline figure.
+lets you change the threshold. Loading and scoring are verified live in
+Chrome 136 — see [Verify](#verify).
 
 > Chrome removed support for the `--load-extension` command-line flag in M137,
 > so the extension must be loaded through the UI as above. This affects
@@ -114,21 +110,75 @@ end-to-end sample, consistent with the 75.9% offline figure.
 
 ## Verify
 
+Four layers, each proving something the others do not. They are listed in
+increasing order of how much they actually tell you.
+
+**1 — Unit tests.** Pure logic: view geometry, the size gate's invariants,
+message validation, badge rendering against a DOM.
+
 ```bash
-npm run typecheck
-npm test          # 97 unit tests
-npm run verify    # typecheck + test + build
+npm run verify    # typecheck + 97 tests + build
 ```
 
-To reproduce the accuracy numbers, see
-[docs/EVALUATION.md](docs/EVALUATION.md#reproducing). To check the browser
-pipeline against the Python reference:
+**2 — Offline accuracy.** The numbers in
+[docs/EVALUATION.md](docs/EVALUATION.md#reproducing), reproduced from the
+corpus with the Python harness in `tools/eval/`.
+
+**3 — Browser parity.** Runs the *shipped* modules against the *shipped*
+weights in a real browser and diffs per-image scores against the Python
+reference, because canvas and Pillow are different resamplers.
 
 ```bash
 node tools/parity/build-parity.mjs /tmp/fl-parity
-cd /tmp/fl-parity && python3 -m http.server 8801
-# open http://localhost:8801 — runs the shipped modules on real weights
+cd /tmp/fl-parity && python3 -m http.server 8801   # then open localhost:8801
 ```
+
+**4 — Live end-to-end.** Loads the packed `dist/` into a real Chrome, opens a
+page of labelled images, and checks that badges appear in the page's DOM with
+scores on them. This is the only layer that tests the extension rather than the
+model.
+
+```bash
+PER_SOURCE=2 node tools/e2e/make-testpage.mjs /tmp/fl-testpage
+cd /tmp/fl-testpage && python3 -m http.server 8799 &
+CHROME_BIN="/path/to/Chrome for Testing" node tools/e2e/live-test.mjs
+```
+
+`CHROME_BIN` must be Chrome **136 or earlier** — M137 removed the
+`--load-extension` flag the harness drives. That constraint is on the
+*automation* only; installing by hand works on current Chrome.
+
+### What layer 4 found
+
+Layers 1–3 all passed while the extension was completely broken — not
+degraded, but never once having worked. Two defects, both fatal, neither
+reachable without a browser:
+
+- The manifest declared `worker-src 'self' blob:`. Chrome rejects `blob:` in
+  that directive and refused to load the extension **on every version**.
+- Once installable, ONNX Runtime's WebGPU provider blocked the offscreen
+  document's thread synchronously at 100% CPU and never returned, so the
+  engine never became ready and nothing was ever scored.
+
+Both are fixed and described in
+[docs/EVALUATION.md](docs/EVALUATION.md#live-browser-verification-and-two-bugs-only-it-could-find).
+Current live result on Chrome 136:
+
+```
+engine   ready · backend wasm · 2 models
+page     56 images, 20 within the viewport margin → 20 scored, 20 badges
+badge    "AI 38% · below 65%"
+scores   AI recall 69.2% (9/13) · specificity 85.7% (6/7) · bACC@0.65 77.5%
+```
+
+Twenty of fifty-six is the intended behaviour, not a shortfall: discovery is
+viewport-gated, so a page of 5,000 thumbnails costs 5,000 cheap DOM checks
+rather than 5,000 inference runs. Scroll and the rest are scored.
+
+The 77.5% is twenty images — far too small to be an accuracy measurement. It is
+here to show the shipped pipeline produces sane scores end-to-end, and that it
+lands near the 75.9% offline figure rather than somewhere unrelated. The real
+numbers are in [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ## Privacy
 
