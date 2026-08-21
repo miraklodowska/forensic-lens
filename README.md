@@ -3,9 +3,9 @@
 A Manifest V3 Chrome extension that scores the images on any page for AI
 generation, running entirely on your own machine. No cloud inference, no API
 calls, no local server — the models are packed into the extension and no image
-data or telemetry is sent anywhere. The one network cost is stated plainly:
-each analysed image is re-fetched once from its own origin (see
-[Privacy](#privacy) for why).
+data or telemetry is sent anywhere. For most images it makes **no network
+request at all**: the content script hands the already-decoded pixels to the
+scorer. See [Privacy](#privacy) for the exception.
 
 Every analysed image gets a badge with a confidence score; anything at or above
 the threshold (65% by default) is called out.
@@ -34,17 +34,19 @@ synchronous, no timeout can recover it — the provider simply cannot be
 attempted here. (It also mis-executes this build's INT8 operators, returning a
 constant for every input; see [docs/EVALUATION.md](docs/EVALUATION.md).)
 
-Images are fetched by URL in the offscreen document rather than read off the
-page, because a cross-origin image taints any canvas it is drawn into, and
-extension messaging is JSON, so decoded pixels cannot be transferred out of the
-content script. (`chrome.tabs.captureVisibleTab` could sidestep both — see
-[Privacy](#privacy) for why it is the wrong trade here.) This refetch is **not** a
-cache hit — Chrome partitions its HTTP cache by top-level site, and the
-extension's offscreen document is never the page's site — so **every analysed
-image costs one outbound GET to its own origin**. To keep that honest and
-minimal, discovery analyses `currentSrc`, the exact variant the page already
-displayed, never a larger srcset candidate the page didn't load. The request
-carries `credentials: 'omit'`, and no image data leaves the browser.
+Getting pixels to the scorer takes two paths. Where the page permits it — a
+same-origin image, or a cross-origin one served with CORS — the content script
+draws the already-decoded image to a canvas and hands it over as a lossless PNG
+`data:` URL. Nothing is re-downloaded, so analysis costs **zero network
+requests** and works with networking disabled.
+
+Where it does not — a cross-origin image without CORS taints the canvas and its
+pixels cannot be read — the offscreen document falls back to fetching the URL,
+and that is a real request: Chrome partitions its HTTP cache by top-level site,
+so the page's cached copy is invisible to a `chrome-extension://` document.
+Discovery analyses `currentSrc`, the exact variant the page displayed, never a
+larger srcset candidate it never loaded, and the request carries
+`credentials: 'omit'`. No image data leaves the browser on either path.
 
 ### Detection
 
@@ -99,6 +101,11 @@ offline — you can disconnect and everything below still works.
 2. Turn on **Developer mode** (top right)
 3. Click **Load unpacked** and choose the `dist/` directory
 4. Visit any page with images
+
+To analyse local pages opened as `file://`, also switch on **Allow access to
+file URLs** on the extension's card. Chrome guards that setting against
+scripted changes, so it is a manual step and the `file://` path is the one part
+of the extension not covered by the automated live test.
 
 The popup shows the backend in use, how many images have been analysed, and
 lets you change the threshold. Loading and scoring are verified live in
@@ -183,25 +190,25 @@ numbers are in [docs/EVALUATION.md](docs/EVALUATION.md).
 ## Privacy
 
 - No image data or telemetry is transmitted anywhere.
-- **At analysis time, each analysed image is re-fetched once from its own
-  origin** (the same `currentSrc` URL the page already displayed, with
-  `credentials: 'omit'`). The image's host can observe that second request;
-  no third party is contacted. Chrome's partitioned HTTP cache means it really
-  does hit the network, not the cache. An earlier version of this README
-  claimed the refetch was "normally a cache hit"; that was wrong.
-- Why not read the pixels off the page instead? For cross-origin images that
-  does not work: canvas tainting blocks the readback and extension messaging
-  is JSON, so it cannot carry an `ImageBitmap`. Both were tested rather than
-  assumed — see `docs/review/taint-test.mjs`.
-- One alternative *would* avoid the request: `chrome.tabs.captureVisibleTab`,
-  cropping the image's rectangle out of a viewport capture. It is rejected on
-  a measurement argument, not an impossibility one. A capture returns pixels at
-  **display** resolution, so a 1024px photo shown as a 200px thumbnail comes
-  back as 200px of rescaled pixels — destroying exactly the native-resolution
-  detail the fingerprint detector reads, in precisely the size regime where
-  accuracy is already worst. It trades a network request for the signal itself.
-- Consequence: **analysis needs the network.** Offline, pages render their
-  cached images but no badges appear.
+- **Images the page lets us read cost no network request at all.** The content
+  script reads the decoded pixels and passes them inline as a lossless PNG
+  `data:` URL. Verified: on a 56-image page the server logged exactly one GET
+  per image — the page's own load — and none from the extension.
+- **Cross-origin images without CORS are the exception.** Canvas tainting
+  blocks reading their pixels (tested, not assumed —
+  `docs/review/taint-test.mjs`), so those fall back to one GET to the image's
+  own origin, with `credentials: 'omit'`. The image's host can observe that
+  request; no third party is ever contacted. On a typical page whose images
+  come from a CDN, expect this path; on a same-origin page, expect none.
+  An earlier README called that refetch "normally a cache hit" and later
+  "unavoidable"; both were wrong.
+- `chrome.tabs.captureVisibleTab` would also avoid the request, and is still
+  rejected: a capture returns pixels at **display** resolution, so a 1024px
+  photo shown as a 200px thumbnail comes back as 200px of rescaled pixels,
+  destroying the native detail the fingerprint detector reads in exactly the
+  regime where accuracy is already worst.
+- Consequence: **analysis works offline** for same-origin and CORS images.
+  Cross-origin images without CORS cannot be scored with networking disabled.
 - At build time, `fetch:models` downloads one pinned, hash-verified model
   artifact. Nothing else is fetched, ever.
 - Nothing is written to disk beyond your settings in `chrome.storage.local`.

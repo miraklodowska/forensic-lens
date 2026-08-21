@@ -6,7 +6,7 @@
  * constantly and re-running inference on them would waste the whole budget.
  */
 
-const ANALYZABLE_PROTOCOLS = new Set(['http:', 'https:', 'blob:']);
+const ANALYZABLE_PROTOCOLS = new Set(['http:', 'https:', 'blob:', 'file:']);
 const DATA_IMAGE_RE = /^data:image\/[a-z0-9.+-]+[;,]/i;
 
 /** 32-bit FNV-1a; used only to shorten data: URLs, never for integrity. */

@@ -30,7 +30,11 @@ const BACKENDS = new Set<string>(['webgpu', 'wasm']);
  * worker's LRU cache; real keys are normalized URLs or short data: digests.
  */
 const MAX_KEY_LENGTH = 2048;
-const MAX_SRC_LENGTH = 1024 * 1024;
+/**
+ * Large because `src` may be a lossless PNG data: URL carrying a decoded image
+ * (see the content script's pixel handoff). A 1500px frame is a few MB.
+ */
+const MAX_SRC_LENGTH = 12 * 1024 * 1024;
 const MAX_REQUEST_ID_LENGTH = 64;
 
 /** content script -> service worker: please score this image. */
